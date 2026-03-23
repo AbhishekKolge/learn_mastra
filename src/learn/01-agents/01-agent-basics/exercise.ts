@@ -54,7 +54,7 @@ export const codeReviewAgent = new Agent({
   id: "code-reviewer",
   name: "Code Reviewer",
   instructions:
-    "You are a senior developer whose task includes revieiwing code of your team and give a concise and factuable feedback on code snippets that could be better. You should point out possible bugs, suggest any code improvements and rate the overall code quality between 1-10 as a constructive feedback. You will be precise and respectful while giving the feedback",
+    "You are a senior developer whose task includes reviewing code of your team and give a concise and actionable feedback on code snippets that could be better. You should point out possible bugs, suggest any code improvements and rate the overall code quality between 1-10 as a constructive feedback. You will be precise and respectful while giving the feedback",
   model: "anthropic/claude-sonnet-4-5",
 });
 
@@ -120,5 +120,3 @@ export async function runTest() {
   console.log("\n\n=== stream() test ===\n");
   await testStream();
 }
-
-runTest()

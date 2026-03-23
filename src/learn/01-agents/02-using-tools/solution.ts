@@ -79,9 +79,34 @@ export async function runTest() {
   console.log('Tools called:', r3.toolCalls?.map(tc => tc.toolName));
 
   console.log('\n=== Test 4: Force a specific tool ===\n');
-  const r4 = await mathTutorAgent.generate('Tell me a fun fact', {
+  const r4 = await mathTutorAgent.generate('What is 42 + 58?', {
     toolChoice: { type: 'tool', toolName: 'calculatorTool' },
   });
   console.log('Answer:', r4.text);
   console.log('Tools called:', r4.toolCalls?.map(tc => tc.toolName));
+
+  console.log('\n=== Test 5: Restrict available tools with activeTools ===\n');
+  // Only make randomNumberTool available — agent CAN'T use the calculator
+  const r5 = await mathTutorAgent.generate('What is 100 / 4?', {
+    activeTools: ['randomNumberTool'],
+  });
+  console.log('Answer:', r5.text);
+  console.log('Tools called:', r5.toolCalls?.map(tc => tc.toolName));
+  // The agent will either answer from knowledge or say it can't calculate
+
+  console.log('\n=== Test 6: Observe toolName in streams ===\n');
+  // toolName in stream events comes from the OBJECT KEY used when
+  // registering tools, NOT the tool's `id` property.
+  //   tools: { calculatorTool }  → toolName: "calculatorTool"
+  //   tools: { [calculatorTool.id]: calculatorTool } → toolName: "calculator"
+  const stream = await mathTutorAgent.stream('What is 100 / 4?');
+  for await (const chunk of stream.fullStream) {
+    if (chunk.type === 'tool-call') {
+      console.log('Tool called:', chunk.toolName, '| args:', JSON.stringify(chunk.args));
+      // Notice: toolName is "calculatorTool" (the object key), NOT "calculator" (the id)
+    }
+    if (chunk.type === 'tool-result') {
+      console.log('Tool result:', JSON.stringify(chunk.result));
+    }
+  }
 }
