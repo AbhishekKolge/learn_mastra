@@ -86,7 +86,22 @@ import { z } from 'zod';
 //     execute: async ({ expression }) => { ... },
 //   })
 
-export const calculatorTool = undefined as any; // ← replace this
+export const calculatorTool = createTool({
+  id: 'calculator',
+  description: 'Evaluates a mathematical expression and returns the numeric result. Use for any arithmetic calculation.',
+  inputSchema: z.object({
+    expression: z.string().describe('A math expression like "2 + 3 * 4"'),
+  }),
+  outputSchema: z.object({
+    result: z.number(),
+    expression: z.string(),
+  }),
+  execute: async ({ expression }) => {
+    // Simple eval for math — in production, use a proper math parser
+    const result = new Function('return ' + expression)() as number;
+    return { result, expression };
+  },
+});
 
 // ─── TODO 2: Create a random number tool ────────────────────
 // This tool should:
@@ -95,7 +110,23 @@ export const calculatorTool = undefined as any; // ← replace this
 //
 // Hint: Math.floor(Math.random() * (max - min + 1)) + min
 
-export const randomNumberTool = undefined as any; // ← replace this
+export const randomNumberTool = createTool({
+  id: 'random-number',
+  description: 'Generates a random integer between min and max (inclusive). Use when the user asks for a random number.',
+  inputSchema: z.object({
+    min: z.number().describe('Minimum value (inclusive)'),
+    max: z.number().describe('Maximum value (inclusive)'),
+  }),
+  outputSchema: z.object({
+    value: z.number(),
+    min: z.number(),
+    max: z.number(),
+  }),
+  execute: async ({ min, max }) => {
+    const value = Math.floor(Math.random() * (max - min + 1)) + min;
+    return { value, min, max };
+  },
+});
 
 // ─── TODO 3: Create the Math Tutor agent ────────────────────
 // Create an agent that:
@@ -105,7 +136,17 @@ export const randomNumberTool = undefined as any; // ← replace this
 //
 // Register both tools in the `tools` object.
 
-export const mathTutorAgent = undefined as any; // ← replace this
+export const mathTutorAgent = new Agent({
+  id: 'math-tutor',
+  name: 'Math Tutor',
+  instructions: `You are a math tutor.
+    - Use the calculator tool for any arithmetic calculations
+    - Use the random number tool when asked for random numbers
+    - Show your work: explain what you calculated and why
+    - For multi-step problems, use tools step by step`,
+  model: 'anthropic/claude-haiku-4-5',
+  tools: { calculatorTool, randomNumberTool },
+});
 
 // ─── TODO 4: Test the agent ─────────────────────────────────
 // Write tests that verify the agent calls the right tools.
@@ -121,23 +162,33 @@ export const mathTutorAgent = undefined as any; // ← replace this
 export async function runTest() {
   console.log('=== Test 1: Calculator ===\n');
   // TODO: Ask agent to calculate (15 + 27) * 3 and print response
+  // const response1 = await mathTutorAgent.generate('What is (15 + 27) * 3?');
+  // console.log(response1.text);
 
-  console.log('\n=== Test 2: Random Number ===\n');
+  // console.log('\n=== Test 2: Random Number ===\n');
   // TODO: Ask agent for a random number between 1 and 100
+  // const response2 = await mathTutorAgent.generate('Give me a random number between 1 and 100');
+  // console.log(response2.text);
 
-  console.log('\n=== Test 3: Combined ===\n');
+  // console.log('\n=== Test 3: Combined ===\n');
   // TODO: Ask agent a question that requires both tools
+  // const response3 = await mathTutorAgent.generate('Pick a random number between 1 and 10 and multiply it by 7');
+  // console.log(response3.text)
 
-  console.log('\n=== Test 4: Force a specific tool ===\n');
+  // console.log('\n=== Test 4: Force a specific tool ===\n');
   // TODO: Use toolChoice to force the calculator tool
   // Hint: agent.generate('...', { toolChoice: { type: 'tool', toolName: 'calculatorTool' } })
+  // const response4 = await mathTutorAgent.generate('What is 42 + 58?', { toolChoice: { type: 'tool', toolName: 'calculatorTool' } });
+  // console.log(response4.text);
 
-  console.log('\n=== Test 5: Restrict available tools with activeTools ===\n');
+  // console.log('\n=== Test 5: Restrict available tools with activeTools ===\n');
   // TODO: Use activeTools to make ONLY the randomNumberTool available
   // Then ask a math calculation question — the agent can't use the calculator!
   // Hint: agent.generate('...', { activeTools: ['randomNumberTool'] })
+  // const response5 = await mathTutorAgent.generate('What is 100 / 4?', { activeTools: ['randomNumberTool'] });
+  // console.log(response5.toolCalls);
 
-  console.log('\n=== Test 6: Observe toolName in streams ===\n');
+  // console.log('\n=== Test 6: Observe toolName in streams ===\n');
   // TODO: Use agent.stream() and iterate over stream.fullStream
   // Look at each chunk — when chunk.type includes 'tool', print chunk.toolName
   // Notice: toolName comes from the OBJECT KEY (e.g., 'calculatorTool'),
@@ -145,7 +196,11 @@ export async function runTest() {
   //
   // const stream = await mathTutorAgent.stream('What is 100 / 4?')
   // for await (const chunk of stream.fullStream) {
-  //   if (chunk.type === 'tool-call') console.log('Tool called:', chunk.toolName)
-  //   if (chunk.type === 'tool-result') console.log('Tool result:', chunk.result)
+  //   console.log(chunk);
+    
+  //   if (chunk.type === 'tool-call') console.log('Tool called:', chunk.payload.toolName)
+  //   if (chunk.type === 'tool-result') console.log('Tool result:', chunk.payload.result)
   // }
 }
+
+runTest();

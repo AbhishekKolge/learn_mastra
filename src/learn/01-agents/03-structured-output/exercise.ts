@@ -35,19 +35,30 @@
  * ============================================================
  */
 
-import { Agent } from '@mastra/core/agent';
-import { z } from 'zod';
+import { Agent } from "@mastra/core/agent";
+import { createTool } from "@mastra/core/tools";
+import { z } from "zod";
+
+const languageAnalyzer = createTool({
+  id: "language-analyzer",
+  description: "Analyzes a programming language",
+  inputSchema: z.object({ language: z.string() }),
+  outputSchema: z.object({ name: z.string(), paradigms: z.array(z.string()), strengths: z.array(z.string()), weaknesses: z.array(z.string()), useCases: z.array(z.object({ scenario: z.string(), reasoning: z.string() })), rating: z.number(), summary: z.string() }),
+  execute: async ({ language }) => {
+    return { name: language, paradigms: ["object-oriented", "functional"], strengths: ["Type safety", "Strong typing", "Static analysis"], weaknesses: ["Slower compilation", "Steep learning curve"], useCases: [{ scenario: "Web development", reasoning: "TypeScript is a statically typed programming language that is a superset of JavaScript. It is a great choice for web development because it is a statically typed language that helps catch errors at compile time." }], rating: 9, summary: "TypeScript is a statically typed programming language that is a superset of JavaScript. It is a great choice for web development because it is a statically typed language that helps catch errors at compile time." };
+  },
+});
 
 // ─── Setup: Create a simple analysis agent ──────────────────
 export const analysisAgent = new Agent({
-  id: 'language-analyst',
-  name: 'Language Analyst',
+  id: "language-analyst",
+  name: "Language Analyst",
   instructions: `
     You are a programming language expert. When asked about a language,
     provide detailed, accurate analysis including strengths, weaknesses,
     and common use cases. Be objective and thorough.
   `,
-  model: 'anthropic/claude-sonnet-4-5',
+  model: "anthropic/claude-haiku-4-5"
 });
 
 // ─── TODO 1: Define a Zod schema for language analysis ──────
@@ -60,7 +71,15 @@ export const analysisAgent = new Agent({
 //   - rating: number (1-10)
 //   - summary: string
 
-const languageAnalysisSchema = undefined as any; // ← replace with z.object({...})
+const languageAnalysisSchema = z.object({
+  name: z.string(),
+  paradigms: z.array(z.string()),
+  strengths: z.array(z.string()),
+  weaknesses: z.array(z.string()),
+  useCases: z.array(z.object({ scenario: z.string(), reasoning: z.string() })),
+  rating: z.number(),
+  summary: z.string(),
+});
 
 // ─── TODO 2: Use structured output with generate() ──────────
 // Call analysisAgent.generate() with:
@@ -70,7 +89,14 @@ const languageAnalysisSchema = undefined as any; // ← replace with z.object({.
 
 export async function testStructuredGenerate() {
   // TODO: implement
-  console.log('TODO: implement testStructuredGenerate');
+  const response = await analysisAgent.generate(
+    "Analyze TypeScript as a programming language.", {
+      structuredOutput:{
+        schema: languageAnalysisSchema,
+      }
+    }
+  );
+  console.log(response.object);
 }
 
 // ─── TODO 3: Use structured output with stream() ────────────
@@ -82,7 +108,22 @@ export async function testStructuredGenerate() {
 
 export async function testStructuredStream() {
   // TODO: implement
-  console.log('TODO: implement testStructuredStream');
+  const stream = await analysisAgent.stream(
+    "Analyze TypeScript as a programming language.",
+    {
+      structuredOutput: {
+        schema: languageAnalysisSchema,
+      },
+    },
+  );
+  for await (const chunk of stream.fullStream) {
+    if(chunk.type === 'object-result') {
+      console.log(chunk.object);
+    }
+  }
+
+  const obj = await stream.object;
+  console.log(obj);
 }
 
 // ─── TODO 4: Error handling with fallback ───────────────────
@@ -96,7 +137,25 @@ export async function testFallbackStrategy() {
   // TODO: Define a strict schema
   // TODO: Call generate with errorStrategy: 'fallback' and a fallbackValue
   // TODO: Print the result
-  console.log('TODO: implement testFallbackStrategy');
+  const response = await analysisAgent.generate(
+    "Analyze TypeScript as a programming language.",
+    {
+      structuredOutput: {
+        schema: languageAnalysisSchema,
+        errorStrategy: 'fallback',
+        fallbackValue: {
+          name: "TypeScript",
+          paradigms: ["object-oriented", "functional"],
+          strengths: ["Type safety", "Strong typing", "Static analysis"],
+          weaknesses: ["Slower compilation", "Steep learning curve"],
+          useCases: [{ scenario: "Web development", reasoning: "TypeScript is a statically typed programming language that is a superset of JavaScript. It is a great choice for web development because it is a statically typed language that helps catch errors at compile time." }],
+          rating: 9,
+          summary: "TypeScript is a statically typed programming language that is a superset of JavaScript. It is a great choice for web development because it is a statically typed language that helps catch errors at compile time.",
+        },
+      },
+    },
+  );
+  console.log(JSON.stringify(response.object));
 }
 
 // ─── TODO 5 (BONUS): Structuring agent pattern ─────────────
@@ -113,7 +172,16 @@ export async function testFallbackStrategy() {
 
 export async function testStructuringAgent() {
   // TODO: (bonus) implement
-  console.log('TODO: implement testStructuringAgent (bonus)');
+  const response = await analysisAgent.generate(
+    "Analyze TypeScript as a programming language.",
+    {
+      structuredOutput: {
+        schema: languageAnalysisSchema,
+        model: "anthropic/claude-opus-4-6",
+      },
+    },
+  );
+  console.log(response.object);
 }
 
 // ─── TODO 6: prepareStep for multi-step tool + structured output ─
@@ -125,11 +193,11 @@ export async function testStructuringAgent() {
 //
 // This is a callback you pass to generate() or stream():
 //
-//   await agent.generate('weather in London?', {
+//  const response = await analysisAgent.generate('Analyze TypeScript as a programming language.', {
 //     prepareStep: async ({ stepNumber }) => {
 //       if (stepNumber === 0) {
 //         return {
-//           tools: { weatherTool },
+//           tools: { languageAnalyzer },
 //           toolChoice: 'required',
 //         };
 //       }
@@ -151,7 +219,21 @@ export async function testStructuringAgent() {
 export async function testPrepareStep() {
   // TODO: (bonus) Create an agent with a tool, then use prepareStep
   //       to do tool calling in step 0 and structured output in step 1
-  console.log('TODO: implement testPrepareStep (bonus)');
+  const response = await analysisAgent.generate("Analyze TypeScript as a programming language.", {
+    prepareStep: ({stepNumber}) => {
+      if(stepNumber === 0) {
+        return {
+          tools: { languageAnalyzer },
+          toolChoice: 'required',
+        };
+      }
+      return {
+        tools: undefined,
+        structuredOutput: { schema: languageAnalysisSchema },
+      };
+    }
+  })
+  console.log(response.object);
 }
 
 // ─── TODO 7: jsonPromptInjection for incompatible models ────
@@ -185,18 +267,20 @@ export async function testPrepareStep() {
 
 // ─── Run all tests ──────────────────────────────────────────
 export async function runTest() {
-  console.log('=== Structured Generate ===\n');
-  await testStructuredGenerate();
+  // console.log('=== Structured Generate ===\n');
+  // await testStructuredGenerate();
 
-  console.log('\n=== Structured Stream ===\n');
-  await testStructuredStream();
+  // console.log('\n=== Structured Stream ===\n');
+  // await testStructuredStream();
 
-  console.log('\n=== Fallback Strategy ===\n');
-  await testFallbackStrategy();
+  // console.log('\n=== Fallback Strategy ===\n');
+  // await testFallbackStrategy();
 
-  console.log('\n=== Structuring Agent (Bonus) ===\n');
-  await testStructuringAgent();
+  // console.log('\n=== Structuring Agent (Bonus) ===\n');
+  // await testStructuringAgent();
 
-  console.log('\n=== prepareStep (Bonus) ===\n');
-  await testPrepareStep();
+  // console.log('\n=== prepareStep (Bonus) ===\n');
+  // await testPrepareStep();
 }
+
+runTest();
