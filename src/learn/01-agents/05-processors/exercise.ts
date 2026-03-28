@@ -43,7 +43,10 @@
  * ============================================================
  */
 
-import { Agent } from '@mastra/core/agent';
+import { Agent, MastraDBMessage } from '@mastra/core/agent';
+import { ProcessInputArgs, ProcessInputStepArgs, ProcessInputStepResult, Processor, ProcessorMessageResult, ProcessOutputResultArgs, ProcessOutputStepArgs, ProcessOutputStreamArgs } from '@mastra/core/processors';
+import { createTool } from '@mastra/core/tools';
+import { z } from 'zod';
 
 // ─── TODO 1: Create a logging input processor ───────────────
 // This processor should:
@@ -62,7 +65,21 @@ import { Agent } from '@mastra/core/agent';
 //
 // Note: processInput receives and returns { messages, systemMessages }
 
-const loggingProcessor = undefined as any; // ← replace
+class LoggingProcessor implements Processor {
+  id = 'logging-processor';
+  async processInput(result: ProcessInputArgs): Promise<MastraDBMessage[]> {
+
+    const timestamp = new Date().toISOString();
+    console.log(`[LOG] Input messages: ${timestamp}`);
+
+    const systemMessage = result.systemMessages
+    const messages = result.messages
+    console.log({messages, systemMessage});
+
+    return  messages
+    
+  }
+}
 
 // ─── TODO 2: Create a timestamp output processor ────────────
 // This processor should:
@@ -74,7 +91,30 @@ const loggingProcessor = undefined as any; // ← replace
 //   { messages, response, ... }
 // You need to modify the assistant message content.
 
-const timestampProcessor = undefined as any; // ← replace
+class TimestampProcessor implements Processor {
+  id = 'timestamp-processor';
+  async processOutputResult(result: ProcessOutputResultArgs): Promise<MastraDBMessage[]>  {
+
+  
+  const updatedMessages = result.messages.map((msg) => {
+    console.log({msg});
+      return {
+        ...msg,
+        content: {
+          ...msg.content,
+          metadata: {
+            ...msg.content.metadata,
+            processedAt: new Date().toISOString(),
+          },
+        },
+      }
+     
+    });
+  
+    
+    return updatedMessages
+  }
+}
 
 // ─── TODO 3: Create a word-limit processor ──────────────────
 // This processor should:
@@ -88,7 +128,19 @@ const timestampProcessor = undefined as any; // ← replace
 // Return { retry: true, feedback: '...' } to request a retry.
 // The agent will re-run with the feedback injected.
 
-const wordLimitProcessor = undefined as any; // ← replace
+class WordLimitProcessor implements Processor {
+  id = 'word-limit-processor';
+  async processOutputStep(args: ProcessOutputStepArgs) {
+    
+    if( args.text && args.text?.length >10) {
+      return args.abort('Response is too long', {
+        retry: true,
+      })
+    }
+    
+    return []
+  }
+}
 
 // ─── TODO 4: Create an agent with all processors ────────────
 // Register:
@@ -97,17 +149,23 @@ const wordLimitProcessor = undefined as any; // ← replace
 //
 // Set maxProcessorRetries to 2 to limit retry attempts.
 
-export const processedAgent = undefined as any; // ← replace
+export const processedAgent = new Agent({
+  id: 'processed-agent',
+  name: 'processed-agent',
+  instructions: 'You are a helpful assistant. Keep your answers concise.',
+  model: 'anthropic/claude-haiku-4-5',
+  inputProcessors: [new LoggingProcessor()],
+  outputProcessors: [new WordLimitProcessor(), new TimestampProcessor()],
+  maxProcessorRetries: 2,
+})
 
 // ─── TODO 5: Test the agent ─────────────────────────────────
 export async function testProcessors() {
-  console.log('=== Processor Test ===\n');
-  // TODO: Call processedAgent.generate() with a question
-  // Observe:
-  //   - The logging processor printing input messages
-  //   - The response having a timestamp appended
-  //   - If response is too long, the word limit processor triggering retries
-  console.log('TODO: implement');
+  // console.log('=== Processor Test ===\n');
+  const result = await processedAgent.generate('What is TypeScript in one sentence?');
+  console.log('Response:', result.text);
+  console.log('\nUI Messages:', JSON.stringify(result.response?.uiMessages, null, 2));
+
 }
 
 // ─── TODO 6: processInputStep — per-step configuration ──────
@@ -131,6 +189,61 @@ export async function testProcessors() {
 // prepareStep() in generate/stream is shorthand for this:
 //   agent.generate('...', { prepareStep: async ({ stepNumber }) => {...} })
 
+// class DynamicProcessor implements Processor {
+//   id = 'dynamic-processor';
+//   async processInputStep(args: ProcessInputStepArgs): Promise<ProcessInputStepResult | MastraDBMessage[]> {
+    
+//     if(args.stepNumber > 1 ) {
+//       return{toolChoice: 'none', model: 'anthropic/claude-sonnet-4-5'}
+//     }
+    
+//     return args.messages
+//   }
+//   async processOutputStep(args: ProcessOutputStepArgs): Promise< MastraDBMessage[]> {
+
+//     // args.messages.forEach((msg) => {
+//     //   if(msg.role === 'assistant') {
+//     //     console.log({metadata: msg.content.metadata});
+//     //   }
+//     // });
+//     return args.messages
+//   }
+// }
+
+// export const calculatorAgent = new Agent({
+//   id: 'calculator-agent',
+//   name: 'calculator-agent',
+//   instructions: 'You are a calculator agent. You can only use the calculatorTool to calculate the sum of two numbers.',
+//   model: 'anthropic/claude-haiku-4-5',
+//   tools: { calculatorTool: createTool({
+//     id: 'calculator-tool',
+//     description: 'A tool that can calculate the sum of two numbers.',
+//     inputSchema: z.object({ a: z.number(), b: z.number(), operation: z.enum(['add', 'multiply', 'divide']) }),
+//     outputSchema: z.object({ result: z.number() }),
+//     execute: async ({ a, b, operation }) => {
+//       if(operation === 'add') {
+//         return { result: a + b }
+//       }
+//       if(operation === 'multiply') {
+//         return { result: a * b }
+//       }
+//       if(operation === 'divide') {
+//         return { result: a / b }
+//       }
+//       return { result: 0 }
+//     },
+//   }) },
+//   inputProcessors: [new DynamicProcessor()],
+//   outputProcessors: [new DynamicProcessor()],
+// });
+
+// export async function testCalculatorAgent() {
+//   console.log('=== Processor Test ===\n');
+//   const result = await calculatorAgent.generate('Give me sum of 1 and 12, then multiply the result by 10, then divide the result by 2');
+//   // console.log('Response:', result.text);
+//   console.log('\nUI Messages:', JSON.stringify(result.response?.uiMessages, null, 2));
+// }
+
 // ─── TODO 7: processOutputStream — filter stream chunks ─────
 // processOutputStream transforms chunks BEFORE they reach the client.
 // Return null to filter out a chunk, or modify and return it.
@@ -145,6 +258,57 @@ export async function testProcessors() {
 //
 // Set processDataParts = true to also receive custom data-* chunks
 // emitted by tools via writer.custom().
+
+// class StreamFilterProcessor implements Processor {
+//   id = 'stream-filter-processor';
+//   async processOutputStream(args: ProcessOutputStreamArgs) {
+//     if(args.part.type === 'text-delta') {
+    
+//       return {
+//         ...args.part,
+//         payload: {
+//           ...args.part.payload,
+//           text:`${args.part.payload.text} Hello World...!`
+//         },
+//       }
+//     }
+//     return args.part
+//   }
+// }
+
+// export const calculatorAgent = new Agent({
+//   id: 'calculator-agent',
+//   name: 'calculator-agent',
+//   instructions: 'You are a calculator agent. You can only use the calculatorTool to calculate the sum of two numbers.',
+//   model: 'anthropic/claude-haiku-4-5',
+//   tools: { calculatorTool: createTool({
+//     id: 'calculator-tool',
+//     description: 'A tool that can calculate the sum of two numbers.',
+//     inputSchema: z.object({ a: z.number(), b: z.number(), operation: z.enum(['add', 'multiply', 'divide']) }),
+//     outputSchema: z.object({ result: z.number() }),
+//     execute: async ({ a, b, operation }) => {
+//       if(operation === 'add') {
+//         return { result: a + b }
+//       }
+//       if(operation === 'multiply') {
+//         return { result: a * b }
+//       }
+//       if(operation === 'divide') {
+//         return { result: a / b }
+//       }
+//       return { result: 0 }
+//     },
+//   }) },
+//  outputProcessors: [new StreamFilterProcessor()],
+// });
+
+// async function testStreamFilterProcessor() {
+// const stream = await calculatorAgent.stream('Give me sum of 1 and 12, then multiply the result by 10, then divide the result by 2');
+// for await (const chunk of stream.textStream) {
+//   console.log(chunk);
+// }
+  
+// }
 
 // ─── TODO 8: Custom stream events via writer ────────────────
 // Output processors receive a `writer` object for emitting custom
@@ -293,6 +457,9 @@ export async function testProcessors() {
 //   const msg = result.response?.uiMessages?.find(m => m.role === 'assistant');
 //   console.log(msg?.metadata?.customData);
 
-export async function runTest() {
-  await testProcessors();
-}
+// export async function runTest() {
+//   await testProcessors();
+// }
+
+// runTest()
+// testStreamFilterProcessor()

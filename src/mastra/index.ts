@@ -8,11 +8,14 @@ import { weatherAgent } from './agents/weather-agent';
 import { toolCallAppropriatenessScorer, completenessScorer, translationScorer } from './scorers/weather-scorer';
 import { mathTutorAgent } from '../learn/01-agents/02-using-tools/exercise';
 import { analysisAgent } from '../learn/01-agents/03-structured-output/exercise';
+import { blogSupervisor } from '../learn/01-agents/04-supervisor-agents/exercise';
+import { processedAgent } from '../learn/01-agents/05-processors/exercise';
+import { dbAdminAgent } from '../learn/01-agents/07-agent-approval/exercise';
 
 
 export const mastra = new Mastra({
   workflows: { weatherWorkflow },
-  agents: { mathTutorAgent,analysisAgent },
+  agents: { mathTutorAgent,analysisAgent,blogSupervisor,processedAgent,dbAdminAgent },
   scorers: { toolCallAppropriatenessScorer, completenessScorer, translationScorer },
   storage: new LibSQLStore({
     id: "mastra-storage",

@@ -202,5 +202,3 @@ export async function runTest() {
   //   if (chunk.type === 'tool-result') console.log('Tool result:', chunk.payload.result)
   // }
 }
-
-runTest();

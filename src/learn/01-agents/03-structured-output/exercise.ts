@@ -43,9 +43,34 @@ const languageAnalyzer = createTool({
   id: "language-analyzer",
   description: "Analyzes a programming language",
   inputSchema: z.object({ language: z.string() }),
-  outputSchema: z.object({ name: z.string(), paradigms: z.array(z.string()), strengths: z.array(z.string()), weaknesses: z.array(z.string()), useCases: z.array(z.object({ scenario: z.string(), reasoning: z.string() })), rating: z.number(), summary: z.string() }),
+  outputSchema: z.object({
+    name: z.string(),
+    paradigms: z.array(z.string()),
+    strengths: z.array(z.string()),
+    weaknesses: z.array(z.string()),
+    useCases: z.array(
+      z.object({ scenario: z.string(), reasoning: z.string() }),
+    ),
+    rating: z.number(),
+    summary: z.string(),
+  }),
   execute: async ({ language }) => {
-    return { name: language, paradigms: ["object-oriented", "functional"], strengths: ["Type safety", "Strong typing", "Static analysis"], weaknesses: ["Slower compilation", "Steep learning curve"], useCases: [{ scenario: "Web development", reasoning: "TypeScript is a statically typed programming language that is a superset of JavaScript. It is a great choice for web development because it is a statically typed language that helps catch errors at compile time." }], rating: 9, summary: "TypeScript is a statically typed programming language that is a superset of JavaScript. It is a great choice for web development because it is a statically typed language that helps catch errors at compile time." };
+    return {
+      name: language,
+      paradigms: ["object-oriented", "functional"],
+      strengths: ["Type safety", "Strong typing", "Static analysis"],
+      weaknesses: ["Slower compilation", "Steep learning curve"],
+      useCases: [
+        {
+          scenario: "Web development",
+          reasoning:
+            "TypeScript is a statically typed programming language that is a superset of JavaScript. It is a great choice for web development because it is a statically typed language that helps catch errors at compile time.",
+        },
+      ],
+      rating: 9,
+      summary:
+        "TypeScript is a statically typed programming language that is a superset of JavaScript. It is a great choice for web development because it is a statically typed language that helps catch errors at compile time.",
+    };
   },
 });
 
@@ -58,7 +83,7 @@ export const analysisAgent = new Agent({
     provide detailed, accurate analysis including strengths, weaknesses,
     and common use cases. Be objective and thorough.
   `,
-  model: "anthropic/claude-haiku-4-5"
+  model: "anthropic/claude-haiku-4-5",
 });
 
 // ─── TODO 1: Define a Zod schema for language analysis ──────
@@ -90,11 +115,12 @@ const languageAnalysisSchema = z.object({
 export async function testStructuredGenerate() {
   // TODO: implement
   const response = await analysisAgent.generate(
-    "Analyze TypeScript as a programming language.", {
-      structuredOutput:{
+    "Analyze TypeScript as a programming language.",
+    {
+      structuredOutput: {
         schema: languageAnalysisSchema,
-      }
-    }
+      },
+    },
   );
   console.log(response.object);
 }
@@ -117,7 +143,7 @@ export async function testStructuredStream() {
     },
   );
   for await (const chunk of stream.fullStream) {
-    if(chunk.type === 'object-result') {
+    if (chunk.type === "object-result") {
       console.log(chunk.object);
     }
   }
@@ -142,15 +168,22 @@ export async function testFallbackStrategy() {
     {
       structuredOutput: {
         schema: languageAnalysisSchema,
-        errorStrategy: 'fallback',
+        errorStrategy: "fallback",
         fallbackValue: {
           name: "TypeScript",
           paradigms: ["object-oriented", "functional"],
           strengths: ["Type safety", "Strong typing", "Static analysis"],
           weaknesses: ["Slower compilation", "Steep learning curve"],
-          useCases: [{ scenario: "Web development", reasoning: "TypeScript is a statically typed programming language that is a superset of JavaScript. It is a great choice for web development because it is a statically typed language that helps catch errors at compile time." }],
+          useCases: [
+            {
+              scenario: "Web development",
+              reasoning:
+                "TypeScript is a statically typed programming language that is a superset of JavaScript. It is a great choice for web development because it is a statically typed language that helps catch errors at compile time.",
+            },
+          ],
           rating: 9,
-          summary: "TypeScript is a statically typed programming language that is a superset of JavaScript. It is a great choice for web development because it is a statically typed language that helps catch errors at compile time.",
+          summary:
+            "TypeScript is a statically typed programming language that is a superset of JavaScript. It is a great choice for web development because it is a statically typed language that helps catch errors at compile time.",
         },
       },
     },
@@ -219,20 +252,23 @@ export async function testStructuringAgent() {
 export async function testPrepareStep() {
   // TODO: (bonus) Create an agent with a tool, then use prepareStep
   //       to do tool calling in step 0 and structured output in step 1
-  const response = await analysisAgent.generate("Analyze TypeScript as a programming language.", {
-    prepareStep: ({stepNumber}) => {
-      if(stepNumber === 0) {
+  const response = await analysisAgent.generate(
+    "Analyze TypeScript as a programming language.",
+    {
+      prepareStep: ({ stepNumber }) => {
+        if (stepNumber === 0) {
+          return {
+            tools: { languageAnalyzer },
+            toolChoice: "required",
+          };
+        }
         return {
-          tools: { languageAnalyzer },
-          toolChoice: 'required',
+          tools: undefined,
+          structuredOutput: { schema: languageAnalysisSchema },
         };
-      }
-      return {
-        tools: undefined,
-        structuredOutput: { schema: languageAnalysisSchema },
-      };
-    }
-  })
+      },
+    },
+  );
   console.log(response.object);
 }
 
@@ -269,18 +305,12 @@ export async function testPrepareStep() {
 export async function runTest() {
   // console.log('=== Structured Generate ===\n');
   // await testStructuredGenerate();
-
   // console.log('\n=== Structured Stream ===\n');
   // await testStructuredStream();
-
   // console.log('\n=== Fallback Strategy ===\n');
   // await testFallbackStrategy();
-
   // console.log('\n=== Structuring Agent (Bonus) ===\n');
   // await testStructuringAgent();
-
   // console.log('\n=== prepareStep (Bonus) ===\n');
   // await testPrepareStep();
 }
-
-runTest();

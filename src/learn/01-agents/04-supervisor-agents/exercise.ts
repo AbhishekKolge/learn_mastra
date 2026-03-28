@@ -84,7 +84,7 @@
  * ============================================================
  */
 
-import { Agent } from '@mastra/core/agent';
+import { Agent } from "@mastra/core/agent";
 
 // ─── TODO 1: Create the Researcher agent ────────────────────
 // This agent should:
@@ -95,7 +95,15 @@ import { Agent } from '@mastra/core/agent';
 // Important: The `description` field tells the supervisor WHEN to
 // delegate to this agent. Make it specific!
 
-export const researcherAgent = undefined as any; // ← replace
+export const researcherAgent = new Agent({
+  id: "researcher",
+  name: "Researcher",
+  description:
+    "A agent that is good at gathering key points about a topic and returning bullet-point research summaries.",
+  instructions:
+    "You are a researcher. You are good at gathering key points about a topic and returning bullet-point research summaries.",
+  model: "anthropic/claude-haiku-4-5",
+});
 
 // ─── TODO 2: Create the Writer agent ────────────────────────
 // This agent should:
@@ -103,7 +111,15 @@ export const researcherAgent = undefined as any; // ← replace
 //   - Follow a clear structure: title, intro, body, conclusion
 //   - Have a clear `description` for the supervisor
 
-export const writerAgent = undefined as any; // ← replace
+export const writerAgent = new Agent({
+  id: "writer",
+  name: "Writer",
+  description:
+    "A agent that is good at writing a polished blog post from research notes.",
+  instructions:
+    "You are a writer. You are good at writing a polished blog post from research notes.",
+  model: "anthropic/claude-haiku-4-5",
+});
 
 // ─── TODO 3: Create the Supervisor agent ────────────────────
 // The supervisor should:
@@ -119,7 +135,19 @@ export const writerAgent = undefined as any; // ← replace
 //     agents: [researcherAgent, writerAgent],
 //   })
 
-export const blogSupervisor = undefined as any; // ← replace
+export const blogSupervisor = new Agent({
+  id: "blog-supervisor",
+  name: "Blog Post Factory",
+  description:
+    "A supervisor that is good at coordinating the researcher and writer agents.",
+  instructions:
+    "You are a supervisor that is good at coordinating the researcher and writer agents. When given a topic, you should first delegate to the researcher agent to gather key points and facts, then delegate to the writer agent to write a polished blog post.",
+  model: "anthropic/claude-haiku-4-5",
+  agents: {
+    researcher: researcherAgent,
+    writer: writerAgent,
+  },
+});
 
 // ─── TODO 4: Test the supervisor ────────────────────────────
 // Send a blog topic to the supervisor and watch it delegate.
@@ -128,6 +156,8 @@ export const blogSupervisor = undefined as any; // ← replace
 // Check response.steps to see the delegation chain:
 //   - Which agents were called?
 //   - What prompts were sent to each?
+
+// const response = await blogSupervisor.generate('Write a blog post about the future of AI.');
 
 // ─── TODO 5: Add delegation hooks ───────────────────────────
 // Create a SECOND supervisor with hooks to control delegation.
@@ -164,7 +194,53 @@ export const blogSupervisor = undefined as any; // ← replace
 //     },
 //   })
 
-export const hookedSupervisor = undefined as any; // ← replace (or skip for now)
+export const hookedSupervisor = new Agent({
+  id: "hooked-blog-supervisor",
+  name: "Blog Post Factory (Hooked)",
+  description:
+    "A supervisor that is good at coordinating the researcher and writer agents with delegation hooks.",
+  instructions:
+    "You are a supervisor that is good at coordinating the researcher and writer agents with delegation hooks. When given a topic, you should first delegate to the researcher agent to gather key points and facts, then delegate to the writer agent to write a polished blog post.",
+  model: "anthropic/claude-haiku-4-5",
+  agents: {
+    researcher: researcherAgent,
+    writer: writerAgent,
+  },
+  defaultOptions: {
+    maxSteps: 10,
+    delegation: {
+      onDelegationStart: async (ctx) => {
+        console.log(`Delegating to: ${ctx.primitiveId}`);
+        console.log(`Prompt: ${ctx.prompt.slice(0, 100)}...`);
+        if (ctx.primitiveId === "researcher") {
+          return {
+            proceed: true,
+            modifiedPrompt: `${ctx.prompt}\n\nFocus on recent 2025-2026 data.`,
+            modifiedMaxSteps: 5,
+          };
+        }
+        if (ctx.iteration > 5) {
+          return { proceed: false, rejectionReason: "Too many iterations." };
+        }
+        return { proceed: true };
+      },
+      onDelegationComplete: async (ctx) => {
+        if (ctx.error) {
+          // ctx.bail();
+          // bail() is a function that stops the supervisor loop immediately
+          console.log(`Delegation failed: ${ctx.error}`);
+          return { feedback: `${ctx.primitiveId} failed. Try another approach.` };
+        }
+        console.log(`${ctx.primitiveId} completed successfully`);
+      }
+    },
+  },
+});
+
+// const response = await hookedSupervisor.generate(
+//   "Write a blog post about the future of AI.",
+// );
+
 
 // ─── TODO 5b: Per-call delegation hooks ─────────────────────
 // Hooks can ALSO be passed per-call via the `delegation` option
@@ -230,9 +306,9 @@ export const hookedSupervisor = undefined as any; // ← replace (or skip for no
 //   }
 
 export async function runTest() {
-  console.log('=== Blog Post Factory ===\n');
+  console.log("=== Blog Post Factory ===\n");
   // TODO: Call blogSupervisor.generate() with a blog topic
   // TODO: Print the final response
   // TODO: Inspect response.steps to see delegation chain
-  console.log('TODO: implement');
+  console.log("TODO: implement");
 }

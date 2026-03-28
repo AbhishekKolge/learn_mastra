@@ -54,13 +54,31 @@ const database: Record<string, { name: string; email: string }> = {
   '1': { name: 'Alice', email: 'alice@example.com' },
   '2': { name: 'Bob', email: 'bob@example.com' },
   '3': { name: 'Charlie', email: 'charlie@example.com' },
-};
+}
 
 // ─── TODO 1: Create a "read" tool (no approval needed) ──────
 // This tool queries the database and returns a user record.
 // It's a safe, read-only operation — no approval needed.
 
-export const readUserTool = undefined as any; // ← replace
+export const readUserTool = createTool({
+  id: 'read-user',
+  description: 'Look up a user by ID and return their name and email. Safe read-only operation.',
+  inputSchema: z.object({
+    userId: z.string().describe('The user ID to look up'),
+  }),
+  outputSchema: z.object({
+    found: z.boolean(),
+    user: z.object({
+      name: z.string(),
+      email: z.string(),
+    }).optional(),
+  }),
+  execute: async ({ userId }) => {
+    const user = database[userId];
+    if (!user) return { found: false };
+    return { found: true, user };
+  },
+})
 
 // ─── TODO 2: Create a "delete" tool (REQUIRES approval) ─────
 // This tool deletes a user from the database.
@@ -73,12 +91,40 @@ export const readUserTool = undefined as any; // ← replace
 //     ...
 //   })
 
-export const deleteUserTool = undefined as any; // ← replace
+export const deleteUserTool = createTool({
+  id: 'delete-user',
+  description: 'Delete a user from the database by ID. This is a DESTRUCTIVE operation that cannot be undone.',
+  requireApproval: true,
+  inputSchema: z.object({
+    userId: z.string().describe('The user ID to delete'),
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    deletedUser: z.object({
+      name: z.string(),
+      email: z.string(),
+    }).optional(),
+    message: z.string(),
+  }),
+  execute: async ({ userId }) => {
+    const user = database[userId];
+    if (!user) return { success: false, message: `User ${userId} not found` };
+    const deleted = { ...user };
+    delete database[userId];
+    return { success: true, deletedUser: deleted, message: `User ${userId} (${deleted.name}) has been deleted` };
+  },
+})
 
 // ─── TODO 3: Create the Database Admin agent ────────────────
 // Register both tools. The agent should be able to read and delete users.
 
-export const dbAdminAgent = undefined as any; // ← replace
+export const dbAdminAgent = new Agent({
+  id: 'db-admin',
+  name: 'Database Admin',
+  instructions: 'You are a database administrator. You can read and delete users using the readUserTool and deleteUserTool tools respectively.',
+  tools: { readUserTool, deleteUserTool },
+  model: 'anthropic/claude-haiku-4-5',
+})
 
 // ─── TODO 4: Test approval flow ─────────────────────────────
 // This is best tested in Mastra Studio (pnpm dev) where the UI
@@ -94,20 +140,38 @@ export const dbAdminAgent = undefined as any; // ← replace
 // Mastra Studio handles this for you with a nice UI.
 
 export async function runTest() {
-  console.log('=== Approval Test ===\n');
-  console.log('This module is best tested in Mastra Studio!');
-  console.log('1. Register dbAdminAgent in src/mastra/index.ts');
-  console.log('2. Run: pnpm dev');
-  console.log('3. Open http://localhost:4111');
-  console.log('4. Chat with the Database Admin agent');
-  console.log('5. Try: "Delete user 2" — you should see an approval dialog');
-  console.log('6. Try: "Show me user 1" — should work without approval\n');
+
+
+  // asked to delete user 1
+  const result = await dbAdminAgent.stream('Delete user 1');
+
+  for await (const chunk of result.fullStream) {
+    // can i delete user 1?
+   if(chunk.type === 'tool-call-approval') {
+    setTimeout(async () => {
+      // yes
+      const approved = await dbAdminAgent.approveToolCall({
+        runId: chunk.runId,
+      });
+
+      for await (const chunk of approved.textStream) {
+        console.log(chunk);
+      }
+      
+    }, 5000);
+   }
+  }
+
+  
+
+ 
 
   // Quick test: read (no approval needed)
   // TODO: Call dbAdminAgent.generate('Show me user 1')
   // TODO: Print the response
 }
 
+// runTest()
 // ─── TODO 5: Programmatic approval with stream() ────────────
 // Full programmatic flow:
 //
@@ -150,6 +214,27 @@ export async function runTest() {
 //     });
 //     console.log('Result after approval:', result.text);
 //   }
+
+// export async function runTest2() {
+//   const result = await dbAdminAgent.generate('Delete user 1');
+ 
+//   if(result.finishReason === 'suspended') {
+
+//     const toolName = result.suspendPayload?.toolName;
+
+//     console.log(`asking permission for ${toolName}`);
+
+//     if(toolName && result.runId) {
+//       const approved = await dbAdminAgent.approveToolCallGenerate({
+//         runId: result.runId,
+//       })
+//       console.log(approved.text);
+//     }
+//   }
+  
+ 
+// }
+// runTest2()
 
 // ─── TODO 7: Runtime suspension with suspend() ──────────────
 // Unlike pre-execution approval (pauses BEFORE execute),
